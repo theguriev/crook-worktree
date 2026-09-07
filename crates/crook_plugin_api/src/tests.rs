@@ -61,6 +61,8 @@ fn every_capability_says_what_it_is_in_a_sentence() {
         Capability::Clipboard,
         Capability::Storage,
         Capability::ReadFiles(vec!["~/.claude/.credentials.json".into()]),
+        Capability::WatchCommands,
+        Capability::WatchBells,
     ] {
         let sentence = capability.sentence();
         assert!(!sentence.is_empty(), "{capability:?} says nothing");
@@ -256,6 +258,7 @@ fn a_shut_panel_costs_almost_nothing() {
 fn what_a_render_is_about_survives_the_wire() {
     let render = Render {
         slot: "tab.row.mark".into(),
+        entry: "mark".into(),
         subject: Some(Subject::Tab(TabFacts {
             key: 0x9e37_79b9_7f4a_7c15,
             tab: Some(TabInfo {
@@ -277,6 +280,47 @@ fn what_a_render_is_about_survives_the_wire() {
         from_bytes::<Render>(&bytes).expect("and decode"),
         render,
         "a render does not survive its own wire"
+    );
+}
+
+#[test]
+fn an_explained_note_survives_the_wire() {
+    // The shape a control with its own explanation has: the thing in the slot,
+    // and beside it the whole of what a card would otherwise have to say
+    // permanently.
+    let tree = Node::Explained {
+        content: Box::new(Node::Pressable {
+            content: Box::new(Node::Badge {
+                text: "Microwave".into(),
+                tone: Tone::Accent,
+            }),
+            action: "open".into(),
+        }),
+        explanation: Box::new(Node::Column(vec![
+            Node::Row(vec![
+                Node::Text {
+                    text: "Microwave".into(),
+                    size: Size::Body,
+                    tone: Tone::Primary,
+                },
+                Node::Fill,
+                Node::Badge {
+                    text: "ringing".into(),
+                    tone: Tone::Accent,
+                },
+            ]),
+            Node::Rule,
+            Node::Note {
+                text: "Plays when a command that ran for two seconds or more finishes.".into(),
+                tone: Tone::Muted,
+            },
+        ])),
+    };
+
+    let bytes = to_bytes(&tree).expect("a tree should encode");
+    assert_eq!(
+        from_bytes::<Node>(&bytes).expect("a tree should decode"),
+        tree
     );
 }
 
@@ -303,4 +347,63 @@ fn a_plugin_granted_nothing_is_still_told_which_row_it_is_drawing() {
         "{} bytes for a row a plugin may know nothing about",
         bytes.len()
     );
+}
+
+#[test]
+fn a_note_is_described_on_every_frame_and_that_is_what_it_costs() {
+    // The one price of the host showing a note itself rather than asking for
+    // it when the pointer arrives: the words are on the wire whether or not
+    // anybody is looking. The alternative is a call into the guest per pointer
+    // transition, on the thread that draws — so this is the trade, and the
+    // number is here so that a change to it is a change somebody notices.
+    let sheet = Node::Note {
+        text: "Plays when a command that ran for two seconds or more finishes.".into(),
+        tone: Tone::Muted,
+    };
+    let bare = Node::Badge {
+        text: "Microwave".into(),
+        tone: Tone::Accent,
+    };
+    let explained = Node::Explained {
+        content: Box::new(bare.clone()),
+        explanation: Box::new(sheet),
+    };
+
+    let cost = to_bytes(&explained).expect("it should encode").len()
+        - to_bytes(&bare).expect("it should encode").len();
+
+    assert!(
+        cost < 128,
+        "{cost} bytes a frame for one sentence of explanation"
+    );
+}
+
+#[test]
+fn an_event_survives_the_wire() {
+    // The only two things the host ever says to a plugin unprompted. A bell
+    // is the smaller of them and the one with a flag in it, and a flag that
+    // came back wrong would be a plugin ringing at every ambiguous Tab
+    // completion somebody's shell answers.
+    for event in [
+        Event::CommandFinished {
+            pane: 7,
+            exit: Some(1),
+            took_millis: Some(4_200),
+        },
+        Event::Bell {
+            pane: 7,
+            while_running: true,
+        },
+        Event::Bell {
+            pane: 7,
+            while_running: false,
+        },
+    ] {
+        let bytes = to_bytes(&event).expect("an event encodes");
+        assert_eq!(
+            from_bytes::<Event>(&bytes).expect("and decodes"),
+            event,
+            "{event:?} did not survive the wire"
+        );
+    }
 }
