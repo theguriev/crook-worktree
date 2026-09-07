@@ -6,10 +6,14 @@ use crook_plugin_api::{Place, TabFacts};
 /// The slot this plugin took, which every request below names.
 const SLOT: &str = "tab.row.badge";
 
+/// The one contribution it put there, which every request below names too.
+const ENTRY: &str = "worktree";
+
 /// A request about a row whose directory the plugin may see.
 fn row(worktree: bool) -> Option<Render> {
     Some(Render {
         slot: String::from(SLOT),
+        entry: String::from(ENTRY),
         subject: Some(Subject::Tab(TabFacts {
             key: 12,
             tab: None,
@@ -26,6 +30,7 @@ fn row(worktree: bool) -> Option<Render> {
 fn redacted() -> Option<Render> {
     Some(Render {
         slot: String::from(SLOT),
+        entry: String::from(ENTRY),
         subject: Some(Subject::Tab(TabFacts {
             key: 12,
             tab: None,
@@ -64,6 +69,7 @@ fn anything_it_was_not_asked_draws_nothing() {
         badge(
             Some(Render {
                 slot: String::from("header.right"),
+                entry: String::from(ENTRY),
                 subject: None,
             }),
             SLOT
@@ -74,6 +80,7 @@ fn anything_it_was_not_asked_draws_nothing() {
         badge(
             Some(Render {
                 slot: String::from(SLOT),
+                entry: String::from(ENTRY),
                 subject: None,
             }),
             SLOT
