@@ -83,10 +83,11 @@ cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/worktree.wasm plugin.wasm
 ```
 
-`crates/crook_plugin_api` is a **copy** of the same directory in Crook, vendored because a
-plugin anybody can build cannot depend on a repository they cannot clone. `ABI_VERSION` is what
-keeps the two honest: a copy that has drifted is a plugin the host refuses by number, at load,
-with a line saying which version each side speaks.
+`crook_plugin_api` is the published crate from crates.io, not a copy. It is versioned
+`0.<abi>.<patch>`, so the `0.8` in `Cargo.toml` is plugin API 8, and moving this plugin to a new
+API is changing that one number. `ABI_VERSION` is compiled into the module from it, and a Crook
+that speaks another number — older or newer — refuses the plugin by number, at load, with a line
+saying which version each side speaks.
 
 Everything except `sys.rs` builds for the host, which is why `cargo test` runs the part that
 decides anything without a terminal to install a plugin into.
